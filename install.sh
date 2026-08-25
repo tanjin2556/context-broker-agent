@@ -24,6 +24,7 @@ REF="${CONTEXT_BROKER_REF:-main}"
 DIR="."
 FORCE=0
 DO_MCP=1
+DO_GITIGNORE=1
 
 # Files fetched into the project. AGENT_SETUP.md is the per-project guide.
 FILES="resident_agent.py start_agent.sh agent.env.example context_bridge.mjs AGENT_SETUP.md"
@@ -37,6 +38,7 @@ Usage: install.sh [options]
   --ref REF          branch, tag, or commit to download (default: main)
   --force            overwrite files that already exist and differ
   --no-mcp           do not touch .mcp.json
+  --no-gitignore     do not add anything to the project's .gitignore
   -h, --help         show this help
 
 Environment: CONTEXT_BROKER_REPO and CONTEXT_BROKER_REF are honoured as defaults.
@@ -50,6 +52,7 @@ while [ $# -gt 0 ]; do
     --ref)     REF="${2:?--ref needs a git ref}"; shift 2 ;;
     --force)   FORCE=1; shift ;;
     --no-mcp)  DO_MCP=0; shift ;;
+    --no-gitignore) DO_GITIGNORE=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'install.sh: unknown option %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -129,11 +132,26 @@ else
   say "Created agent.env from the example -- edit it before starting the agent."
 fi
 
-# That token must never reach a commit.
-if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
-  if ! grep -qx 'agent.env' "$DIR/.gitignore" 2>/dev/null; then
-    printf '\n# context-broker resident agent (agent.env holds an OAuth token)\nagent.env\n.agent/\n' >> "$DIR/.gitignore"
-    say "Appended agent.env and .agent/ to .gitignore."
+# That token must never reach a commit. This is the only tracked file we touch,
+# and the only reason we look at git at all -- rev-parse is a read-only probe.
+# Entries are checked one at a time so a project installed before an entry
+# existed still picks it up, and so we never duplicate what's already there.
+if [ "$DO_GITIGNORE" -eq 1 ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  added=""
+  for entry in 'agent.env' '.agent/' '.mcp.json.bak'; do
+    grep -qxF "$entry" "$DIR/.gitignore" 2>/dev/null && continue
+    if [ -z "$added" ] && [ -s "$DIR/.gitignore" ]; then
+      printf '\n# context-broker resident agent (agent.env holds an OAuth token)\n' >> "$DIR/.gitignore"
+    elif [ -z "$added" ]; then
+      printf '# context-broker resident agent (agent.env holds an OAuth token)\n' >> "$DIR/.gitignore"
+    fi
+    printf '%s\n' "$entry" >> "$DIR/.gitignore"
+    added="$added $entry"
+  done
+  [ -n "$added" ] && say "Added to .gitignore:$added"
+  # Belt and braces: if agent.env is somehow still not ignored, say so loudly.
+  if ! git -C "$DIR" check-ignore -q agent.env 2>/dev/null; then
+    warn "agent.env is NOT ignored by git -- it holds an OAuth token. Fix before committing."
   fi
 fi
 

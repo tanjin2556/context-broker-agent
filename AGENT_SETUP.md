@@ -22,6 +22,29 @@ can reach. If nobody has set one up yet, do that first — see the broker repo's
 
 `.mcp.json.bak` is your previous `.mcp.json`, if you had one.
 
+## What it did to your git repo
+
+Nothing, to the repository itself. The installer runs exactly one git command —
+`git rev-parse --git-dir`, a read-only check for whether this is a repo at all.
+Your branch, HEAD, commit history, staged index, remotes and reflog are all
+untouched; it never runs `add`, `commit`, `checkout`, `init` or `push`.
+
+What it *does* leave is working-tree changes you can review before committing:
+
+- **the installed files, untracked** — `resident_agent.py`, `start_agent.sh`,
+  `agent.env.example`, `context_bridge.mjs`, `AGENT_SETUP.md`, `.mcp.json`.
+  They show up in `git status` for you to commit, or not. Committing them is
+  reasonable if your team shares the setup; the only file that must *never* be
+  committed is `agent.env`.
+- **three lines appended to `.gitignore`** — `agent.env`, `.agent/` and
+  `.mcp.json.bak`. This is the only tracked file the installer modifies, and the
+  reason is `agent.env` holds a long-lived OAuth token. Entries are added
+  individually and skipped if already present, so re-running never duplicates
+  them. Pass `--no-gitignore` to skip this entirely — but then ignore
+  `agent.env` yourself before you commit anything.
+
+`git diff` and `git status` show you all of it. Nothing is staged.
+
 ## Setup
 
 ### 1. Get a subscription token

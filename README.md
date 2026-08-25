@@ -209,7 +209,14 @@ That drops in `resident_agent.py`, `start_agent.sh`, `agent.env`,
 entries into the project's `.mcp.json` — preserving any MCP servers already
 registered there, and backing the file up first. It installs nothing globally
 and starts nothing; re-running it never overwrites your `agent.env` or files
-you've edited (`--force` if you want that). `./install.sh --help` for options.
+you've edited (`--force` if you want that).
+
+It leaves the target project's git repository alone — no `add`, `commit`,
+`checkout` or `init`, and history, index, remotes and branch are untouched. The
+installed files land untracked for you to review, and the one tracked file it
+modifies is `.gitignore`, to add `agent.env` (which holds an OAuth token),
+`.agent/` and `.mcp.json.bak`. `--no-gitignore` skips even that.
+`./install.sh --help` for options.
 
 **By hand**, if you'd rather:
 
