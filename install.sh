@@ -25,6 +25,8 @@ DIR="."
 FORCE=0
 DO_MCP=1
 DO_GITIGNORE=1
+BROKER="${CONTEXT_BROKER_URL:-http://broker:8000}"
+PROJECT=""
 
 # Files fetched into the project. AGENT_SETUP.md is the per-project guide.
 FILES="resident_agent.py start_agent.sh agent.env.example context_bridge.mjs AGENT_SETUP.md"
@@ -37,11 +39,15 @@ Usage: install.sh [options]
   --repo OWNER/REPO  source repo to download from
   --ref REF          branch, tag, or commit to download (default: main)
   --force            overwrite files that already exist and differ
+  --name NAME        seed PROJECT_NAME in a freshly created agent.env
+  --broker URL       broker base URL (default: http://broker:8000). Used for
+                     BOTH the .mcp.json pull entry and BROKER_URL in agent.env
   --no-mcp           do not touch .mcp.json
   --no-gitignore     do not add anything to the project's .gitignore
   -h, --help         show this help
 
-Environment: CONTEXT_BROKER_REPO and CONTEXT_BROKER_REF are honoured as defaults.
+Environment: CONTEXT_BROKER_REPO, CONTEXT_BROKER_REF and CONTEXT_BROKER_URL
+are honoured as defaults.
 USAGE
 }
 
@@ -51,6 +57,8 @@ while [ $# -gt 0 ]; do
     --repo)    REPO="${2:?--repo needs OWNER/REPO}"; shift 2 ;;
     --ref)     REF="${2:?--ref needs a git ref}"; shift 2 ;;
     --force)   FORCE=1; shift ;;
+    --name)    PROJECT="${2:?--name needs a project name}"; shift 2 ;;
+    --broker)  BROKER="${2:?--broker needs a URL}"; shift 2 ;;
     --no-mcp)  DO_MCP=0; shift ;;
     --no-gitignore) DO_GITIGNORE=0; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -61,6 +69,12 @@ done
 say()  { printf '%s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+case "$BROKER" in
+  http://*|https://*) ;;
+  *) die "--broker wants a full URL (http://... or https://...), got: $BROKER" ;;
+esac
+while : ; do case "$BROKER" in */) BROKER="${BROKER%/}" ;; *) break ;; esac; done
 
 [ -d "$DIR" ] || die "no such directory: $DIR"
 DIR=$(cd "$DIR" && pwd)
@@ -129,7 +143,17 @@ if [ -f "$DIR/agent.env" ]; then
   say "Keeping your existing agent.env (not overwritten)."
 else
   cp "$DIR/agent.env.example" "$DIR/agent.env"
-  say "Created agent.env from the example -- edit it before starting the agent."
+  # Only ever seed a file we just created; an existing agent.env is the user's.
+  seed() { # key value
+    sed "s|^$1=.*|$1=$2|" "$DIR/agent.env" > "$DIR/agent.env.tmp"       && mv "$DIR/agent.env.tmp" "$DIR/agent.env"
+  }
+  [ -n "$PROJECT" ] && seed PROJECT_NAME "$PROJECT"
+  seed BROKER_URL "$BROKER"
+  if [ -n "$PROJECT" ]; then
+    say "Created agent.env (PROJECT_NAME=$PROJECT, BROKER_URL=$BROKER) -- add your token."
+  else
+    say "Created agent.env -- set PROJECT_NAME and your token before starting the agent."
+  fi
 fi
 
 # That token must never reach a commit. This is the only tracked file we touch,
@@ -172,7 +196,7 @@ except Exception as exc:
 servers = doc.setdefault("mcpServers", {})
 if not isinstance(servers, dict):
     sys.exit("error: %s has a non-object mcpServers; fix it and re-run" % path)
-servers["context"] = {"type": "http", "url": "http://broker:8000/mcp"}
+servers["context"] = {"type": "http", "url": sys.argv[2] + "/mcp"}
 servers["context-bridge"] = {"command": "node", "args": ["./context_bridge.mjs"]}
 with open(path, "w", encoding="utf-8", newline="\n") as fh:
     json.dump(doc, fh, indent=2)
@@ -192,7 +216,7 @@ if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
   console.error("error: top level of " + p + " is not an object"); process.exit(1);
 }
 if (!doc.mcpServers || typeof doc.mcpServers !== "object") doc.mcpServers = {};
-doc.mcpServers["context"] = { type: "http", url: "http://broker:8000/mcp" };
+doc.mcpServers["context"] = { type: "http", url: process.argv[2] + "/mcp" };
 doc.mcpServers["context-bridge"] = { command: "node", args: ["./context_bridge.mjs"] };
 fs.writeFileSync(p, JSON.stringify(doc, null, 2) + "\n");
 const kept = Object.keys(doc.mcpServers).filter(k => k !== "context" && k !== "context-bridge");
@@ -206,11 +230,11 @@ if [ "$DO_MCP" -eq 1 ]; then
   # A broken .mcp.json is the user's to fix -- report it, but don't abort and
   # leave them without the rest of the summary. The files are already in place.
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c "$MERGE_PY" "$target" || MCP_OK=0
+    python3 -c "$MERGE_PY" "$target" "$BROKER" || MCP_OK=0
   elif command -v python >/dev/null 2>&1; then
-    python -c "$MERGE_PY" "$target" || MCP_OK=0
+    python -c "$MERGE_PY" "$target" "$BROKER" || MCP_OK=0
   elif command -v node >/dev/null 2>&1; then
-    node -e "$MERGE_JS" "$target" || MCP_OK=0
+    node -e "$MERGE_JS" "$target" "$BROKER" || MCP_OK=0
   else
     warn "no python3 or node found -- skipping .mcp.json"
     MCP_OK=0
@@ -225,7 +249,7 @@ for f in $skipped;  do say "  . $f (kept yours)"; done
 say ""
 if [ "$MCP_OK" -eq 0 ]; then
   say "!! .mcp.json was NOT updated. Add these two entries under \"mcpServers\" by hand:"
-  say '     "context": { "type": "http", "url": "http://broker:8000/mcp" },'
+  say "     \"context\": { \"type\": \"http\", \"url\": \"$BROKER/mcp\" },"
   say '     "context-bridge": { "command": "node", "args": ["./context_bridge.mjs"] }'
   say ""
 fi

@@ -5,9 +5,14 @@ project's Claude Code session to a **context broker** shared with your other
 projects, so sessions that each have their own context window can exchange
 context instead of you copy-pasting between them.
 
-You need a broker already running somewhere on a Docker network this container
-can reach. If nobody has set one up yet, do that first — see the broker repo's
-`SETUP.md`.
+**This is only half the system.** These files are the client side. They need a
+**broker** already running and reachable from this container — one broker, shared
+by all your projects. If nobody has stood one up yet, that comes first:
+
+> https://github.com/tanjin2556/context-broker-agent — see `SETUP.md`
+
+Without a reachable broker the agent starts, fails to register, and nothing
+arrives; the session works normally but the cross-project tools do nothing.
 
 ## What got installed
 

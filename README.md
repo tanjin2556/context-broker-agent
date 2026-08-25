@@ -204,6 +204,16 @@ interactive session — no separate container or repo mount.
 curl -fsSL https://raw.githubusercontent.com/tanjin2556/context-broker-agent/main/install.sh | sh
 ```
 
+Pre-fill the config while you're at it — everything but the token:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tanjin2556/context-broker-agent/main/install.sh   | sh -s -- --name payments --broker http://broker:8000
+```
+
+`--broker` sets the URL in **both** places it is needed — the `.mcp.json` pull
+entry and `BROKER_URL` in `agent.env` — so the pull and push halves can't end up
+pointing at different brokers.
+
 That drops in `resident_agent.py`, `start_agent.sh`, `agent.env`,
 `context_bridge.mjs` and an `AGENT_SETUP.md` walkthrough, and merges the two
 entries into the project's `.mcp.json` — preserving any MCP servers already
