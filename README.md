@@ -198,7 +198,10 @@ python broker.py            # 0.0.0.0:8000, MCP at /mcp
 Runs inside each project's existing dev container, in the background, beside the
 interactive session — no separate container or repo mount.
 
-**The quick way** — from the project's root, inside its dev container:
+**The quick way** — run it from the project's root, inside its dev container.
+Root matters: the installed files resolve paths relative to themselves and
+Claude Code only reads `.mcp.json` from the directory you launch it in. From
+anywhere else, pass `--dir <project-root>`.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tanjin2556/context-broker-agent/main/install.sh | sh

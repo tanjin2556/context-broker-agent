@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 # install.sh -- drop the resident-agent + push-bridge files into a project.
 #
-# Run this INSIDE a project's dev container, from that project's root:
+# Run this INSIDE a project's dev container, from that project's root -- the
+# installed files resolve paths relative to themselves, and Claude Code reads
+# .mcp.json from the directory you launch it in. From elsewhere, use --dir.
 #
 #     curl -fsSL https://raw.githubusercontent.com/tanjin2556/context-broker-agent/main/install.sh | sh
 #

@@ -27,6 +27,13 @@ arrives; the session works normally but the cross-project tools do nothing.
 
 `.mcp.json.bak` is your previous `.mcp.json`, if you had one.
 
+These sit in the **project root** on purpose, and moving them apart breaks
+things quietly: `start_agent.sh` resolves paths relative to itself and defaults
+`PROJECT_REPO` to its own directory, `context_bridge.mjs` looks for `agent.env`
+beside itself (override with `AGENT_ENV`), and Claude Code only reads `.mcp.json`
+from the directory you launch it in. If you installed into the wrong place,
+re-run the installer with `--dir <project-root>` and delete the stray copies.
+
 ## What it did to your git repo
 
 Nothing, to the repository itself. The installer runs exactly one git command —
@@ -51,6 +58,30 @@ What it *does* leave is working-tree changes you can review before committing:
 `git diff` and `git status` show you all of it. Nothing is staged.
 
 ## Setup
+
+### 0. Check the broker is actually reachable
+
+Do this first, **from inside this container** — not from the host. Everything
+below is wasted effort if it fails:
+
+```bash
+curl -s http://broker:8000/healthz     # {"ok":true,"projects":N,"notes":N}
+```
+
+If it hangs or refuses, this container isn't on the broker's Docker network.
+From the host:
+
+```bash
+docker network connect hrbc1_hrbc <this-container-name>
+```
+
+Better, add the network to this container's compose file so it survives a
+rebuild. Note `broker` is the compose *service* key — `container_name` does not
+create a DNS name, and with plain `docker run` you need `--network-alias broker`.
+
+If your broker is somewhere else, whatever host and port you `curl` successfully
+must match `BROKER_URL` in `agent.env` **and** the `context` URL in `.mcp.json`.
+Re-running the installer with `--broker <url>` sets both together.
 
 ### 1. Get a subscription token
 
@@ -93,11 +124,16 @@ First run builds a venv at `.agent/venv` and installs `claude-agent-sdk`,
 the system `python3` is older or is missing `venv`, set `AGENT_PYTHON` in
 `agent.env` to a specific interpreter.
 
-On startup it registers itself with the broker. Check from the broker host:
+On startup it registers itself with the broker. Check right here, the same way
+you did in step 0 — `projects` should have gone up by one, and `PROJECT_NAME`
+should be listed:
 
 ```bash
-curl http://localhost:8000/healthz     # "projects" should include this one
+curl -s http://broker:8000/healthz
 ```
+
+If the count didn't move, read `.agent/agent.log`; registration failing is the
+agent's first action, so the reason is at the top.
 
 ### 4. Install the bridge dependency
 
