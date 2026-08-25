@@ -1,0 +1,25 @@
+# Never commit: holds a long-lived CLAUDE_CODE_OAUTH_TOKEN
+agent.env
+.env
+
+# Resident agent runtime (venv, pid, logs)
+.agent/
+
+# Broker
+*.db
+broker-data/
+
+# Deps
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# install.sh backs the original up before merging
+.mcp.json.bak

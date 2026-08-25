@@ -1,0 +1,50 @@
+# Deploy the context broker as a single container.
+#   docker compose -f docker-compose.broker.yml up -d --build
+#
+# Other containers on the configured shared network reach it at the SERVICE name:
+#   MCP tools:   http://broker:8000/mcp
+#   bridge API:  http://broker:8000/bridge/next/<project>, /internal/register
+# (The DNS name is the service key `broker`, not container_name.)
+
+services:
+  broker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ahmedtanjin/agent-context-broker:latest
+    container_name: context-broker
+    restart: unless-stopped
+
+    environment:
+      # Board + registry persist here, on the named volume below.
+      # Set to ":memory:" to run with no persistence.
+      BROKER_DB: /data/broker.db
+
+    ports:
+      - "8000:8000"          # only needed if something on the HOST must reach it;
+                             # drop it for pure container-to-container traffic.
+
+    volumes:
+      - broker-data:/data    # SQLite db survives restarts, redeploys, image rebuilds
+
+    networks:
+      - shared
+
+    # Mirrors the image HEALTHCHECK so `depends_on: condition: service_healthy`
+    # works for resident agents that should wait for the broker.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz', timeout=2).status==200 else 1)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  broker-data:                # `docker volume inspect <stack>_broker-data` to find it on disk
+
+networks:
+  shared:
+    # Override with BROKER_NETWORK=<existing-network-name> when deploying.
+    # Every project container that uses http://broker:8000 must join this network.
+    external: true
+    name: ${BROKER_NETWORK:-hrbc1_hrbc}

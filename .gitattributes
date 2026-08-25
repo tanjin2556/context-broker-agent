@@ -1,0 +1,12 @@
+# These are executed inside Linux containers. A CRLF checkout puts \r in the
+# shebang and the kernel reports "bad interpreter" -- force LF regardless of
+# the contributor's platform or core.autocrlf setting.
+*.sh        text eol=lf
+*.mjs       text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+Dockerfile  text eol=lf
+*.example   text eol=lf
+requirements.txt text eol=lf

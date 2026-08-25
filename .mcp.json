@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "context": { "type": "http", "url": "http://broker:8000/mcp" },
+    "context-bridge": {
+      "command": "node",
+      "args": ["./context_bridge.mjs"]
+    }
+  }
+}
