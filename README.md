@@ -250,10 +250,13 @@ defaults to the dev container's hostname:9100.
 ### Bridge (per session, inside the project container)
 
 ```bash
-npm init -y && npm i @modelcontextprotocol/sdk
+npm i --no-save @modelcontextprotocol/sdk   # install.sh does this for you
 # launched automatically by Claude Code via the .mcp.json entry above,
 # and configured from the same agent.env the resident agent uses
 ```
+
+No `npm init` needed: `--no-save` only populates `node_modules/`, so a project
+without a `package.json` stays without one.
 
 ### What runs where
 

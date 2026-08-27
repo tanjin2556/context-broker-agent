@@ -137,12 +137,19 @@ agent's first action, so the reason is at the top.
 
 ### 4. Install the bridge dependency
 
+`install.sh` already did this, unless you passed `--no-npm` or had no `npm` on
+PATH — it says which. To do it by hand, or to check:
+
 ```bash
-npm i @modelcontextprotocol/sdk
+npm i --no-save @modelcontextprotocol/sdk
 ```
 
+`--no-save` populates `node_modules/` and nothing else: no `package.json` is
+created if the project has none, and an existing one is not rewritten.
+
 `context_bridge.mjs` needs this. It is launched automatically by Claude Code via
-the `.mcp.json` entry — you never run it yourself.
+the `.mcp.json` entry — you never run it yourself. Without it the bridge exits
+immediately and the session reports only `context-bridge (CONNECTION_CLOSED)`.
 
 ### 5. Launch your session with the push channel
 

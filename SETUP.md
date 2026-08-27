@@ -158,7 +158,8 @@ Notes:
 ## 6. Register the broker + bridge in each project's `.mcp.json`
 
 Drop `context_bridge.mjs` into the project **next to the `agent.env` from step
-5**, then `npm i @modelcontextprotocol/sdk`. Add both entries — this JSON is the
+5**, then `npm i --no-save @modelcontextprotocol/sdk` (`install.sh` does both
+for you). Add both entries — this JSON is the
 same in every project, nothing in it is per-project:
 ```json
 {

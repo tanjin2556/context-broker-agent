@@ -13,8 +13,9 @@
 #
 # It installs five runtime files plus a setup guide, and merges two entries into
 # the project's .mcp.json without disturbing MCP servers already registered
-# there. It does NOT start anything, install npm/pip packages, or touch your
-# credentials -- read AGENT_SETUP.md afterwards for the manual steps.
+# there. It installs the push bridge's one npm dependency (--no-npm opts out);
+# it does NOT start anything, install pip packages, or touch your credentials --
+# read AGENT_SETUP.md afterwards for the manual steps.
 #
 # Re-running is safe: an existing agent.env is never overwritten, files you have
 # edited are kept unless --force, and .mcp.json is backed up before it is edited.
@@ -27,6 +28,7 @@ DIR="."
 FORCE=0
 DO_MCP=1
 DO_GITIGNORE=1
+DO_NPM=1
 BROKER="${CONTEXT_BROKER_URL:-http://broker:8000}"
 PROJECT=""
 
@@ -50,6 +52,7 @@ Usage: install.sh [options]
                      BOTH the .mcp.json pull entry and BROKER_URL in agent.env
   --no-mcp           do not touch .mcp.json
   --no-gitignore     do not add anything to the project's .gitignore
+  --no-npm           do not install @modelcontextprotocol/sdk for the bridge
   -h, --help         show this help
 
 Environment: CONTEXT_BROKER_REPO, CONTEXT_BROKER_REF and CONTEXT_BROKER_URL
@@ -67,6 +70,7 @@ while [ $# -gt 0 ]; do
     --broker)  BROKER="${2:?--broker needs a URL}"; shift 2 ;;
     --no-mcp)  DO_MCP=0; shift ;;
     --no-gitignore) DO_GITIGNORE=0; shift ;;
+    --no-npm)  DO_NPM=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'install.sh: unknown option %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -262,6 +266,36 @@ print("ok" if sys.version_info[0] >= 3 else "no")' 2>/dev/null)" = "ok" ]; then
     *)    warn "found no working python3/python/node -- skipping .mcp.json"
           MCP_OK=0 ;;
   esac
+fi
+
+# --- the bridge's one dependency -------------------------------------------- #
+# context_bridge.mjs imports @modelcontextprotocol/sdk. Without it the channel
+# exits at startup and the session reports nothing more useful than a closed
+# connection, so leaving this to the reader cost more than it saved.
+#
+# --no-save is what lets us do this without breaking the guarantee above: it
+# populates node_modules/ and nothing else. No package.json is created in a
+# project that has none, and a project that has one is not rewritten -- so this
+# still changes no tracked file. node_modules/ is deliberately NOT added to
+# .gitignore: a repo that vendors its dependencies on purpose would not thank
+# us for it, so we check and say something instead.
+if [ "$DO_NPM" -eq 1 ]; then
+  if [ -d "$DIR/node_modules/@modelcontextprotocol/sdk" ]; then
+    say "Bridge dependency already installed."
+  elif command -v npm >/dev/null 2>&1; then
+    say "Installing the bridge dependency (npm i --no-save @modelcontextprotocol/sdk)..."
+    if (cd "$DIR" && npm i --no-save --no-audit --no-fund @modelcontextprotocol/sdk >/dev/null 2>&1); then
+      say "Installed @modelcontextprotocol/sdk into node_modules/ (~23MB)."
+      if [ "$DO_GITIGNORE" -eq 1 ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 &&
+         ! git -C "$DIR" check-ignore -q node_modules 2>/dev/null; then
+        warn "node_modules/ is not ignored by git in this project -- add it yourself if that is not deliberate."
+      fi
+    else
+      warn "npm install failed -- run 'npm i @modelcontextprotocol/sdk' in $DIR by hand"
+    fi
+  else
+    warn "npm not found -- install @modelcontextprotocol/sdk in $DIR by hand"
+  fi
 fi
 
 # --- report ----------------------------------------------------------------- #
