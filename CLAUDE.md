@@ -14,7 +14,7 @@ The pieces live in one flat folder but **run in different places**, which is the
 | `resident_agent.py` + `start_agent.sh` | *inside each project's existing dev container*, backgrounded | Python / Claude Agent SDK | per-project expert |
 | `context_bridge.mjs` | stdio subprocess of each interactive session | Node / MCP JS SDK | per-session push relay |
 
-`install.sh` is the fourth kind of thing here: it runs on the *user's* machine, downloads the four project-side files plus `AGENT_SETUP.md` from the public repo (or copies them from a clone), and merges the two `.mcp.json` entries. It is POSIX `sh`, not bash, and is meant to survive `curl | sh` — so no `read`, no bashisms, and the `.mcp.json` merge shells out to python3/python/node in that order. If you add or rename a project-side file, update `FILES` in it.
+`install.sh` is the fourth kind of thing here: it runs on the *user's* machine, downloads the five project-side files plus `AGENT_SETUP.md` from the public repo (or copies them from a clone), and merges the two `.mcp.json` entries. It is POSIX `sh`, not bash, and is meant to survive `curl | sh` — so no `read`, no bashisms, and the `.mcp.json` merge shells out to python3/python/node in that order, probing each with a throwaway program before trusting it — a `command -v` hit is not proof it runs, since Windows ships a Store-alias `python3.exe` that executes nothing. If you add or rename a project-side file, update `FILES` in it.
 
 Only the broker is a container you deploy. `resident_agent.py`, `start_agent.sh`, `agent.env.example`, and `context_bridge.mjs` are *copied into* other projects' containers — treat them as artifacts shipped elsewhere, so avoid adding imports/deps that assume this folder's environment.
 

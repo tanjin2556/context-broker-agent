@@ -11,7 +11,7 @@
 #
 #     ./install.sh --dir /path/to/project
 #
-# It installs four runtime files plus a setup guide, and merges two entries into
+# It installs five runtime files plus a setup guide, and merges two entries into
 # the project's .mcp.json without disturbing MCP servers already registered
 # there. It does NOT start anything, install npm/pip packages, or touch your
 # credentials -- read AGENT_SETUP.md afterwards for the manual steps.
@@ -31,7 +31,11 @@ BROKER="${CONTEXT_BROKER_URL:-http://broker:8000}"
 PROJECT=""
 
 # Files fetched into the project. AGENT_SETUP.md is the per-project guide.
-FILES="resident_agent.py start_agent.sh agent.env.example context_bridge.mjs AGENT_SETUP.md"
+# Both launchers ship every time: which one you need depends on where the agent
+# runs, not on where install.sh runs, and a project checked out on Windows may
+# still be started inside a Linux container (or the reverse). The unused one is
+# 4KB and names the alternative, which beats a wrong-platform guess from uname.
+FILES="resident_agent.py start_agent.sh start_agent.ps1 agent.env.example context_bridge.mjs AGENT_SETUP.md"
 
 usage() {
   cat <<'USAGE'
@@ -231,16 +235,33 @@ if [ "$DO_MCP" -eq 1 ]; then
   [ -f "$target" ] && cp "$target" "$target.bak" && say "Backed up your .mcp.json to .mcp.json.bak"
   # A broken .mcp.json is the user's to fix -- report it, but don't abort and
   # leave them without the rest of the summary. The files are already in place.
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c "$MERGE_PY" "$target" "$BROKER" || MCP_OK=0
-  elif command -v python >/dev/null 2>&1; then
-    python -c "$MERGE_PY" "$target" "$BROKER" || MCP_OK=0
-  elif command -v node >/dev/null 2>&1; then
-    node -e "$MERGE_JS" "$target" "$BROKER" || MCP_OK=0
-  else
-    warn "no python3 or node found -- skipping .mcp.json"
-    MCP_OK=0
+  # `command -v python3` is not proof that python3 runs. Windows ships an App
+  # Execution Alias at WindowsApps/python3.exe that opens the Microsoft Store
+  # and exits without executing anything, so the old first-found-wins chain
+  # picked it, wrote no .mcp.json, and never fell through to the node that was
+  # sitting right there. Probe each candidate with a program whose output we
+  # check, and require Python 3 while we are at it -- MERGE_PY passes
+  # encoding= to open(), which Python 2 does not accept.
+  runner=""
+  for cand in python3 python; do
+    command -v "$cand" >/dev/null 2>&1 || continue
+    if [ "$("$cand" -c 'import sys
+print("ok" if sys.version_info[0] >= 3 else "no")' 2>/dev/null)" = "ok" ]; then
+      runner="py:$cand"
+      break
+    fi
+    warn "$cand is on PATH but does not run Python 3 (a Microsoft Store alias?) -- trying the next interpreter"
+  done
+  if [ -z "$runner" ] && command -v node >/dev/null 2>&1; then
+    [ "$(node -e 'process.stdout.write("ok")' 2>/dev/null)" = "ok" ] && runner="js:node"
   fi
+
+  case "$runner" in
+    py:*) "${runner#py:}" -c "$MERGE_PY" "$target" "$BROKER" || MCP_OK=0 ;;
+    js:*) node -e "$MERGE_JS" "$target" "$BROKER" || MCP_OK=0 ;;
+    *)    warn "found no working python3/python/node -- skipping .mcp.json"
+          MCP_OK=0 ;;
+  esac
 fi
 
 # --- report ----------------------------------------------------------------- #
