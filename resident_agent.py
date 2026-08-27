@@ -29,7 +29,7 @@ Run (use ./start_agent.sh, or directly):
     BROKER_URL=http://broker:8000 \
     python resident_agent.py
 
-SELF_ENDPOINT defaults to http://<this-container-hostname>:9100, which other
+SELF_ENDPOINT defaults to http://<this-container-hostname>:$PORT, which other
 containers on the network can resolve. Override it if your dev container is
 reachable under a different name/alias.
 """
@@ -39,6 +39,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
+from urllib.parse import urlsplit
 
 import httpx
 from aiohttp import web
@@ -47,12 +48,35 @@ from claude_agent_sdk import ClaudeAgentOptions, query
 PROJECT_NAME = os.environ["PROJECT_NAME"]
 PROJECT_REPO = os.environ.get("PROJECT_REPO", os.getcwd())
 BROKER_URL = os.environ.get("BROKER_URL", "http://broker:8000")
-LISTEN_PORT = int(os.environ.get("PORT", "9100"))
+# PORT is what we bind; SELF_ENDPOINT is what other containers dial. They have
+# to agree unless a port mapping sits between them, so whichever one you set
+# fills in the other: name a port in SELF_ENDPOINT and we bind it, set PORT
+# alone and we advertise it. Setting both to different ports stays legal -- a
+# published container port is exactly that -- but is announced, since the
+# far more common cause is a typo in one of the two.
+#
 # Inside the dev container, other containers reach us at this container's
 # hostname. Override SELF_ENDPOINT if your dev container uses a different alias.
-SELF_ENDPOINT = os.environ.get(
-    "SELF_ENDPOINT", f"http://{socket.gethostname()}:{LISTEN_PORT}"
-)
+SELF_ENDPOINT = os.environ.get("SELF_ENDPOINT")
+_advertised_port = urlsplit(SELF_ENDPOINT).port if SELF_ENDPOINT else None
+
+if os.environ.get("PORT"):
+    LISTEN_PORT = int(os.environ["PORT"])
+elif _advertised_port:
+    LISTEN_PORT = _advertised_port
+else:
+    LISTEN_PORT = 9100
+
+if not SELF_ENDPOINT:
+    SELF_ENDPOINT = f"http://{socket.gethostname()}:{LISTEN_PORT}"
+elif _advertised_port and _advertised_port != LISTEN_PORT:
+    print(
+        f"[warn] advertising port {_advertised_port} in SELF_ENDPOINT but "
+        f"binding {LISTEN_PORT} from PORT -- correct only if something "
+        f"forwards {_advertised_port} to {LISTEN_PORT}; otherwise ask_project "
+        f"will time out.",
+        flush=True,
+    )
 
 # --- Auth guard ------------------------------------------------------------ #
 # The SDK drives the Claude CLI, which picks auth in this order: cloud creds >

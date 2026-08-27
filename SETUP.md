@@ -148,9 +148,11 @@ curl http://localhost:8000/healthz     # "projects" count should go up by one
 ```
 
 Notes:
-- `SELF_ENDPOINT` defaults to this container's hostname on port 9100. Only set it
-  in `agent.env` if other containers can't reach this dev container by that
-  hostname (use its service/alias name on `hrbc1_hrbc`, e.g. `http://hrbc1-payments:9100`).
+- `SELF_ENDPOINT` defaults to this container's hostname on `PORT` (default 9100).
+  Only set it in `agent.env` if other containers can't reach this dev container by
+  that hostname (use its service/alias name on `hrbc1_hrbc`, e.g.
+  `http://hrbc1-payments:9100`). The port named there is also the port the agent
+  binds unless `PORT` overrides it.
 - To start it automatically with the container, add to `devcontainer.json`:
   `"postStartCommand": "./start_agent.sh"` (with the token available in the
   container's environment).

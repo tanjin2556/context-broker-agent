@@ -11,6 +11,7 @@ Set AGENT_PYTHON there if this cannot find a Python 3.10+ by itself.
 
 WINDOWS-SPECIFIC NOTES
   * Each project needs its OWN port (they all share one host now): 9100, 9101, ...
+    Set it as PORT, or just name it in SELF_ENDPOINT -- either fills in the other.
   * If the broker runs in a Docker Desktop container, the broker reaches this
     agent via host.docker.internal, so set:
         SELF_ENDPOINT=http://host.docker.internal:<PORT>
@@ -64,6 +65,15 @@ if (Test-Path $envFile) {
 if (-not $env:PROJECT_NAME) { throw 'set PROJECT_NAME (e.g. in agent.env)' }
 if (-not $env:PROJECT_REPO) { $env:PROJECT_REPO = (Get-Location).Path }
 if (-not $env:BROKER_URL)   { $env:BROKER_URL   = 'http://localhost:8000' }
+# PORT (what we bind) and SELF_ENDPOINT (what the broker dials) have to agree,
+# so whichever one is set fills in the other -- naming a port only in
+# SELF_ENDPOINT used to leave the agent listening on 9100 and the broker
+# calling somewhere else. resident_agent.py derives it the same way; doing it
+# here too keeps the status line below honest.
+if (-not $env:PORT -and $env:SELF_ENDPOINT) {
+    $u = $env:SELF_ENDPOINT -as [uri]
+    if ($u -and -not $u.IsDefaultPort) { $env:PORT = "$($u.Port)" }
+}
 if (-not $env:PORT)         { $env:PORT         = '9100' }
 if (-not $env:SELF_ENDPOINT) {
     # Default assumes the broker runs in Docker Desktop and reaches back to the host.

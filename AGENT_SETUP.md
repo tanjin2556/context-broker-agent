@@ -106,10 +106,16 @@ CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 `PROJECT_NAME` must be unique across your projects — it is the address other
 sessions push to. Both halves read this one file, so you set it here only.
 
-`SELF_ENDPOINT` is optional. It defaults to this container's hostname on port
-9100, which is right as long as other containers can resolve that hostname. If
-they can't, set it to this container's service or alias name on the shared
-network (e.g. `http://hrbc1-payments:9100`).
+`SELF_ENDPOINT` is optional. It defaults to this container's hostname on `PORT`
+(itself defaulting to 9100), which is right as long as other containers can
+resolve that hostname. If they can't, set it to this container's service or
+alias name on the shared network (e.g. `http://hrbc1-payments:9100`).
+
+The port works in both directions: the agent binds the port named in
+`SELF_ENDPOINT` unless `PORT` overrides it, so moving a project off 9100 means
+changing one line, not two. Setting them to different ports is still allowed —
+that is what a published container port looks like — but the agent says so at
+startup, because the usual cause is a typo.
 
 ### 3. Start the resident agent
 
